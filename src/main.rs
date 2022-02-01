@@ -54,6 +54,9 @@ async fn get_match_stuff(
         Path((match_id, set_id)): Path<(i32, i32)>,
         Query(params): Query<Params>,
     ) -> String {
+
+    assert_eq!(tokio::spawn(async { 1 }).await.unwrap(), 1);
+
     format!("app_state.cfg = {}, app_state.num = {}\n\
         hello world: match = {}, set = {}, params = {:?}",
             app_state.cfg, app_state.num, match_id, set_id, params)

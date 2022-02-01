@@ -4,10 +4,20 @@
 //! cargo run -p example-hello-world
 //! ```
 
-use axum::{extract::{Path, Query}, routing::get, Router};
+use axum::{
+    AddExtensionLayer,
+    extract::Extension,
+    extract::{Path, Query},
+    routing::get, Router
+};
 use std::net::SocketAddr;
 use serde::{de, Deserialize, Deserializer};
-use std::{fmt, str::FromStr};
+use std::{fmt, str::FromStr, sync::Arc};
+
+struct AppState {
+    cfg: String,
+    num: i32,
+}
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -19,9 +29,16 @@ struct Params {
 
 #[tokio::main]
 async fn main() {
+    let shared_state = Arc::new(AppState {
+        cfg: String::from("hello theo"),
+        num: 837,
+    });
+
+
     // build our application with a route
-    let app = Router::new().route("/matches/:match_id/sets/:set_id",
-            get(get_match_stuff));
+    let app = Router::new()
+            .route("/matches/:match_id/sets/:set_id", get(get_match_stuff))
+            .layer(AddExtensionLayer::new(shared_state));
 
     // run it
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -33,11 +50,13 @@ async fn main() {
 }
 
 async fn get_match_stuff(
+        Extension(app_state): Extension<Arc<AppState>>,
         Path((match_id, set_id)): Path<(i32, i32)>,
         Query(params): Query<Params>,
     ) -> String {
-    format!("hello world: match = {}, set = {}, params = {:?}",
-        match_id, set_id, params)
+    format!("app_state.cfg = {}, app_state.num = {}\n\
+        hello world: match = {}, set = {}, params = {:?}",
+            app_state.cfg, app_state.num, match_id, set_id, params)
 }
 
 /// Serde deserialization decorator to map empty Strings to None,

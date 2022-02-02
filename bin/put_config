@@ -1,0 +1,5 @@
+#!/bin/sh
+curl -X PUT http://localhost:3000/config \
+     -H  Content-Type:application/json \
+     -w "%{http_code}" \
+     -d '{"hub_id": "{\"side_code\": \"BLUE\", \"run_tag\": \"test_tag\", \"match_id\": 101, \"game_id\": 201, \"set_id\": 301}", "arm_parameters": ["BLUE"] }'

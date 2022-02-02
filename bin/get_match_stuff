@@ -1,0 +1,2 @@
+#!/bin/sh
+curl "http://localhost:3000/matches/10/sets/23?job_id=778&tag=hello"

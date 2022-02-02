@@ -11,15 +11,16 @@ use axum::{
     routing::{get, put}, Router
 };
 use std::net::SocketAddr;
-use serde::{de, Deserialize, Deserializer};
+use serde::{de, Serialize, Deserialize, Deserializer};
 use std::{fmt, str::FromStr, sync::Arc};
+use serde_json::json;
 
 struct AppState {
     cfg: String,
     num: i32,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ConfigUpdate {
     hub_id: String,
     arm_parameters: Vec<String>,
@@ -75,15 +76,32 @@ async fn put_update_config(
     ) -> String {
     assert_eq!(tokio::spawn(async { 1 }).await.unwrap(), 1);
 
-    if let Some(cfg_upd) = opt_cfg_upd {
-        format!("cfg_upd:: hub_id = {}, arm_parameters = {:?}\n\
-                 app_state.cfg = {}, app_state.num = {}",
-                    cfg_upd.hub_id,
-                    cfg_upd.arm_parameters,
-                    app_state.cfg, app_state.num)
-    } else {
-        String::from("error")
-    }
+    let json = 
+        if let Some(cfg_upd) = opt_cfg_upd {
+            json!(
+                {
+                    "result" : "success",
+                    "data" : {
+                        "cfg_upd": {
+                            "hub_id":         cfg_upd.hub_id,
+                            "arm_parameters": cfg_upd.arm_parameters
+                        },
+                        "app_state": {
+                            "cfg": app_state.cfg,
+                            "num": app_state.num,
+                        }
+                    }
+                }
+            )
+        } else {
+            json!(
+                {
+                    "result" : "error",
+                    "data"   : "body not json ConfigUpdate Object"
+                }
+            )
+        };
+    serde_json::to_string_pretty(&json).unwrap()
 }
 
 /// Serde deserialization decorator to map empty Strings to None,

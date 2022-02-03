@@ -4,8 +4,9 @@ use std::net::SocketAddr;
 use std::fs::File;
 use daemonize::Daemonize;
 
-#[tokio::main]
-async fn main() {
+use tokio::runtime::Runtime;
+
+fn main() {
     let stdout = File::create("/tmp/daemon.out").unwrap();
     let stderr = File::create("/tmp/daemon.err").unwrap();
 
@@ -20,18 +21,22 @@ async fn main() {
 
     match daemonize.start() {
         Ok(_) => {
-            // build our application with a route
-            let app = Router::new().route("/", get(handler));
+            let rt  = Runtime::new().unwrap();
 
-            // run it
-            let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-            println!("listening on {}", addr);
-            axum::Server::bind(&addr)
-                .serve(app.into_make_service())
-                .await
-                .unwrap();
+            rt.block_on(async {
+                // build our application with a route
+                let app = Router::new().route("/", get(handler));
 
-            println!("Success, daemonized");
+                // run it
+                let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+                println!("listening on {}", addr);
+                axum::Server::bind(&addr)
+                    .serve(app.into_make_service())
+                    .await
+                    .unwrap();
+
+                println!("Success, daemonized");
+            });
         },
         Err(e) => eprintln!("Error, {}", e),
     }

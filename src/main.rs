@@ -37,6 +37,8 @@ fn main() {
 
                 println!("Success, daemonized");
             });
+
+            std::process::exit(0); // needed?
         },
         Err(e) => eprintln!("Error, {}", e),
     }

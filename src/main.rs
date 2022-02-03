@@ -34,27 +34,49 @@ struct Params {
     tag: Option<String>,
 }
 
-#[tokio::main]
-async fn main() {
+use std::fs::File;
+use daemonize::Daemonize;
+use tokio::runtime::Runtime;
+
+fn main() {
     let shared_state = Arc::new(AppState {
         cfg: String::from("hello theo"),
         num: 837,
     });
 
 
-    // build our application with a route
-    let app = Router::new()
-            .route("/config", put(put_update_config))
-            .route("/matches/:match_id/sets/:set_id", get(get_match_stuff))
-            .layer(AddExtensionLayer::new(shared_state));
+    let stdout = File::create("/tmp/daemon.out").unwrap();
+    let stderr = File::create("/tmp/daemon.err").unwrap();
 
-    // run it
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let daemonize = Daemonize::new()
+        .pid_file("/tmp/test.pid") // Every method except `new` and `start`
+        .stdout(stdout)  // Redirect stdout to `/tmp/daemon.out`.
+        .stderr(stderr)  // Redirect stderr to `/tmp/daemon.err`.
+        .privileged_action(|| "Executed before drop privileges");
+
+    match daemonize.start() {
+        Ok(_) => {
+            let rt  = Runtime::new().unwrap();
+            rt.block_on(async {
+                // build our application with a route
+                let app = Router::new()
+                        .route("/config", put(put_update_config))
+                        .route("/matches/:match_id/sets/:set_id", get(get_match_stuff))
+                        .layer(AddExtensionLayer::new(shared_state));
+
+                // run it
+                let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+                println!("listening on {}", addr);
+                axum::Server::bind(&addr)
+                    .serve(app.into_make_service())
+                    .await
+                    .unwrap();
+            });
+
+            println!("Success, daemonized");
+        }
+        Err(e) => eprintln!("Error, {}", e),
+    }
 }
 
 async fn get_match_stuff(

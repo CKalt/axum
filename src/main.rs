@@ -34,27 +34,52 @@ struct Params {
     tag: Option<String>,
 }
 
+use std::fs::File;
+use daemonize::Daemonize;
+
 #[tokio::main]
 async fn main() {
-    let shared_state = Arc::new(AppState {
-        cfg: String::from("hello theo"),
-        num: 837,
-    });
+    let home_dir = "/home/chris/projects/rust/axum/examples/hello-world";
+    let stdout = File::create(format!("{}/daemon.out", home_dir)).unwrap();
+    let stderr = File::create(format!("{}/daemon.err", home_dir)).unwrap();
 
+    let daemonize = Daemonize::new()
+        .pid_file(format!("{}/test.pid", home_dir)) // Every method except `new` and `start`
+//        .chown_pid_file(true)      // is optional, see `Daemonize` documentation
+        .working_directory(home_dir) // for default behaviour.
+//        .user("nobody")
+//        .group("daemon") // Group name
+//        .group(2)        // or group id.
+//        .umask(0o777)    // Set umask, `0o027` by default.
+        .stdout(stdout)  // Redirect stdout to `/tmp/daemon.out`.
+        .stderr(stderr)  // Redirect stderr to `/tmp/daemon.err`.
+        .privileged_action(|| "Executed before drop privileges");
 
-    // build our application with a route
-    let app = Router::new()
-            .route("/config", put(put_update_config))
-            .route("/matches/:match_id/sets/:set_id", get(get_match_stuff))
-            .layer(AddExtensionLayer::new(shared_state));
+    match daemonize.start() {
+        Ok(_) => {
+            let shared_state = Arc::new(AppState {
+                cfg: String::from("hello theo"),
+                num: 837,
+            });
 
-    // run it
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+            // build our application with a route
+            let app = Router::new()
+                    .route("/config", put(put_update_config))
+                    .route("/matches/:match_id/sets/:set_id", get(get_match_stuff))
+                    .layer(AddExtensionLayer::new(shared_state));
+
+            // run it
+            let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+            println!("listening on {}", addr);
+            axum::Server::bind(&addr)
+                .serve(app.into_make_service())
+                .await
+                .unwrap();
+
+            println!("Success, daemonized");
+        }
+        Err(e) => eprintln!("Error, {}", e),
+    }
 }
 
 async fn get_match_stuff(
